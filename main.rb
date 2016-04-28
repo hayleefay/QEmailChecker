@@ -1,6 +1,8 @@
+require 'date'
 require 'dotenv'
 require 'faraday'
 require 'faraday_middleware'
+require 'json'
 require 'multi_json'
 
 # Load in credentials
@@ -17,13 +19,36 @@ session = Faraday.new(url: 'https://api.sumologic.com/api/v1', headers: headers)
   connection.adapter  Faraday.default_adapter
 end
 
+
 # Make the API Request
-input_query = "YOUR_QUERY_HERE"
-params = {q: input_query, from: '', to: '', tz: 'UTC'}
+puts "Making API Request..."
+input_query = "EMD_87fwPXxeDQ3bZ9X"
+params = {q: input_query, from: DateTime.now.prev_day, to: DateTime.now, tz: 'UTC'}
 r = session.get do |req|
   req.url 'logs/search'
   req.params = params
 end
+puts "\tDone!"
 
-# Print out the response body
-puts "#{r.body}"
+
+# Grab the interesting information from each item returned
+puts "Parsing response..."
+r.body.each do |i|
+	raw_message = JSON.parse(i["_raw"])
+
+	fields = raw_message["fields"] unless raw_message.nil?
+	log_level = fields["level"] unless fields.nil?
+
+	unless log_level.nil?
+		if log_level.downcase == "info" && fields["method"].downcase == "logbouncedemail"
+			message_json = '{' + raw_message["message"].split('{')[1]
+			message_json = message_json.split('}')[0] + '}'
+			message_json = JSON.parse(message_json)
+
+			puts "\n\n"
+			puts message_json["Diagnostic-Code"].gsub('x-postfix; ', '')
+			puts "\n\n"
+		end
+	end
+end
+puts "\tDone!"
