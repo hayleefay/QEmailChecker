@@ -1,26 +1,29 @@
-require 'net/http'
+require 'dotenv'
+require 'faraday'
+require 'faraday_middleware'
+require 'multi_json'
 
-#Use sumologic api to get smtp logs for a distribution
-require "dotenv"
+# Load in credentials
 Dotenv.load
 email = ENV['SUMOLOGIC_EMAIL']
 password = ENV['SUMOLOGIC_PASSWORD']
 
-input_query = 'error'
-input_from = ''
-input_to = ''
-#Build sumo logic api uri
-query = input_query
-from = input_from
-to = input_to
-sumologic_uri = "https://api.sumologic.com/api/v1/logs/search?q=#{query}&from=#{from}&to=#{to}"
-uri = URI.parse(sumologic_uri)
-http = Net::HTTP.new(uri.host, uri.port)
-request = Net::HTTP::Get.new(uri.request_uri)
-request.basic_auth(email, password)
-response = http.request(request)
-puts response.body
+# Initialize Faraday session
+headers = {'Content-Type' => 'application/json', 'Accept' => 'application/json'}
+session = Faraday.new(url: 'https://api.sumologic.com/api/v1', headers: headers) do |connection|
+  connection.basic_auth(email, password)
+  connection.request  :json
+  connection.response :json, content_type: 'application/json'
+  connection.adapter  Faraday.default_adapter
+end
 
-#Parse JSON and summarize error data
+# Make the API Request
+input_query = "YOUR_QUERY_HERE"
+params = {q: input_query, from: '', to: '', tz: 'UTC'}
+r = session.get do |req|
+  req.url 'logs/search'
+  req.params = params
+end
 
-#Send JSON response to Qualtrics
+# Print out the response body
+puts "#{r.body}"
